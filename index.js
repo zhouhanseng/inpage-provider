@@ -15,8 +15,13 @@ util.inherits(MetamaskInpageProvider, SafeEventEmitter)
 
 function MetamaskInpageProvider (connectionStream) {
   const self = this
-  self.selectedAddress = undefined
-  self.networkVersion = undefined
+
+  // TODO:1193
+  // self._isConnected = undefined
+
+  // TODO:synchronous
+  // self.selectedAddress = undefined
+  // self.networkVersion = undefined
 
   // super constructor
   SafeEventEmitter.call(self)
@@ -33,21 +38,22 @@ function MetamaskInpageProvider (connectionStream) {
   // subscribe to metamask public config (one-way)
   self.publicConfigStore = new LocalStorageStore({ storageKey: 'MetaMask-Config' })
 
-  // Emit events for some state changes
-  self.publicConfigStore.subscribe(function (state) {
+  // TODO:synchronous
+  // // Emit events for some state changes
+  // self.publicConfigStore.subscribe(function (state) {
 
-    // Emit accountsChanged event on account change
-    if ('selectedAddress' in state && state.selectedAddress !== self.selectedAddress) {
-      self.selectedAddress = state.selectedAddress
-      self.emit('accountsChanged', [self.selectedAddress])
-    }
+  //   Emit accountsChanged event on account change
+  //   if ('selectedAddress' in state && state.selectedAddress !== self.selectedAddress) {
+  //     self.selectedAddress = state.selectedAddress
+  //     self.emit('accountsChanged', [self.selectedAddress])
+  //   }
 
-    // Emit networkChanged event on network change
-    if ('networkVersion' in state && state.networkVersion !== self.networkVersion) {
-      self.networkVersion = state.networkVersion
-      self.emit('networkChanged', state.networkVersion)
-    }
-  })
+  //   Emit networkChanged event on network change
+  //   if ('networkVersion' in state && state.networkVersion !== self.networkVersion) {
+  //     self.networkVersion = state.networkVersion
+  //     self.emit('networkChanged', state.networkVersion)
+  //   }
+  // })
 
   pump(
     mux.createStream('publicConfig'),
@@ -79,21 +85,105 @@ function MetamaskInpageProvider (connectionStream) {
     self.emit('data', null, payload)
   })
 
+  // EIP-1193 subscriptions
+  self.on('data', (error, { method, params }) => {
+    if (!error && method === 'eth_subscription') {
+      self.emit('notification', params.result)
+    }
+  })
+
   // Work around for https://github.com/metamask/metamask-extension/issues/5459
   // drizzle accidently breaking the `this` reference
   self.send = self.send.bind(self)
   self.sendAsync = self.sendAsync.bind(self)
+
+  // indicate that we've connected, for EIP-1193 compliance
+  setTimeout(() => self.emit('connect'))
 }
 
-// Web3 1.0 provider uses `send` with a callback for async queries
-MetamaskInpageProvider.prototype.send = function (payload, callback) {
+// EIP-1102 enable, deprecated, but here for backwards compatibility
+MetamaskInpageProvider.prototype.enable = function () {
   const self = this
 
-  if (callback) {
-    self.sendAsync(payload, callback)
-  } else {
-    return self._sendSync(payload)
+  const promiseCallback = (resolve, reject) => (error, response) => {
+    if (error || response.error) {
+      reject(error || response.error)
+    } else {
+      resolve(response.result)
+    }
   }
+
+  return new Promise((resolve, reject) => {
+    self.sendAsync(
+      {
+        jsonrpc: '2.0',
+        method: 'wallet_requestPermissions',
+        params: [{ eth_requestAccounts: {} }],
+      },
+      promiseCallback(resolve, reject)
+    )
+  })
+  .then(() => {
+    return new Promise((resolve, reject) => {
+      self.sendAsync(
+        {
+          method: 'eth_requestAccounts',
+        },
+        promiseCallback(resolve, reject)
+      )
+    })
+  })
+}
+
+MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallback) {
+  const self = this
+
+  // Web3 1.0 backwards compatibility
+  if (
+    !Array.isArray(methodOrPayload) &&
+    typeof methodOrPayload === 'object' &&
+    typeof paramsOrCallback === 'function'
+  ) {
+    self.sendAsync(payload, callback)
+    return
+  }
+  
+  // Per our docs as of <= 5/31/2019, send accepts a payload and returns
+  // a promise, however per EIP-1193, send should accept a method string
+  // and params array. Here we support both.
+  let method, params
+  if (
+    typeof methodOrPayload === 'object' &&
+    typeof methodOrPayload.method === 'string'
+  ) {
+    method = methodOrPayload.method
+    params = methodOrPayload.params
+  } else if (typeof methodOrPayload === 'string') {
+    method = methodOrPayload
+    params = paramsOrCallback
+  } else {
+    // throw not-supported error
+    const link = 'https://eips.ethereum.org/EIPS/eip-1193'
+    const message = `The MetaMask Web3 object does not support your given parameters. Please use ethereum.send(method: string, params: Array<any>). See ${link} for details.`
+    throw new Error(message)
+  }
+
+  if (!Array.isArray(params)) params = undefined
+
+  return new Promise((resolve, reject) => {
+    try {
+      self.sendAsync(
+        { id: 1, jsonrpc: '2.0', method, params },
+        (error, response) => {
+          error || response.error
+          ? reject(error)
+          : resolve(response)
+        }
+      )
+    } catch (error) {
+      reject(error)
+    }
+  })
 }
 
 // handle sendAsync requests via asyncProvider
@@ -108,56 +198,22 @@ MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
   self.rpcEngine.handle(payload, cb)
 }
 
-MetamaskInpageProvider.prototype._sendSync = function (payload) {
-  const self = this
-
-  let selectedAddress
-  let result = null
-  switch (payload.method) {
-
-    case 'eth_accounts':
-      // read from localStorage
-      selectedAddress = self.publicConfigStore.getState().selectedAddress
-      result = selectedAddress ? [selectedAddress] : []
-      break
-
-    case 'eth_coinbase':
-      // read from localStorage
-      selectedAddress = self.publicConfigStore.getState().selectedAddress
-      result = selectedAddress || null
-      break
-
-    case 'eth_uninstallFilter':
-      self.sendAsync(payload, noop)
-      result = true
-      break
-
-    case 'net_version':
-      const networkVersion = self.publicConfigStore.getState().networkVersion
-      result = networkVersion || null
-      break
-
-    // throw not-supported Error
-    default:
-      var link = 'https://github.com/MetaMask/faq/blob/master/DEVELOPERS.md#dizzy-all-async---think-of-metamask-as-a-light-client'
-      var message = `The MetaMask Web3 object does not support synchronous methods like ${payload.method} without a callback parameter. See ${link} for details.`
-      throw new Error(message)
-
-  }
-
-  // return the result
-  return {
-    id: payload.id,
-    jsonrpc: payload.jsonrpc,
-    result: result,
-  }
-}
-
 MetamaskInpageProvider.prototype.isConnected = function () {
   return true
 }
 
 MetamaskInpageProvider.prototype.isMetaMask = true
+
+// TODO:1193
+// MetamaskInpageProvider.prototype._onClose = function () {
+//   if (this._isConnected === undefined || this._isConnected) {
+//     this._provider.emit('close', {
+//       code: 1011,
+//       reason: 'Network connection error',
+//     })
+//   }
+//   this._isConnected = false
+// }
 
 // util
 
@@ -170,5 +226,3 @@ function logStreamDisconnectWarning (remoteLabel, err) {
     this.emit('error', warningMsg)
   }
 }
-
-function noop () {}
