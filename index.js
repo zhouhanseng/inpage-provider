@@ -14,6 +14,12 @@ module.exports = MetamaskInpageProvider
 
 util.inherits(MetamaskInpageProvider, SafeEventEmitter)
 
+const promiseCallback = (resolve, reject) => (error, response) => {
+  error || response.error
+  ? reject(error || response.error)
+  : resolve(response)
+}
+
 function MetamaskInpageProvider (connectionStream) {
   const self = this
 
@@ -109,47 +115,67 @@ function MetamaskInpageProvider (connectionStream) {
 
   // Work around for https://github.com/metamask/metamask-extension/issues/5459
   // drizzle accidently breaking the `this` reference
+  self.enable = self.enable.bind(self)
   self.send = self.send.bind(self)
   self.sendAsync = self.sendAsync.bind(self)
+  self._sendAsync = self._sendAsync.bind(self)
+  self._requestAccounts = self._requestAccounts.bind(self)
 
   // indicate that we've connected, for EIP-1193 compliance
   setTimeout(() => self.emit('connect'))
 }
 
-// EIP-1102 enable, deprecated, but here for backwards compatibility
+/**
+ * Backwards compatibility method, to be deprecated.
+ */
 MetamaskInpageProvider.prototype.enable = function () {
   const self = this
+  console.warn('MetaMask: ethereum.enable() is deprecated and may be removed in the future. Please use ethereum.send(\'eth_requestAccounts\'). For more details, see: https://eips.ethereum.org/EIPS/eip-1102')
+  return self._requestAccounts()
+}
 
-  const promiseCallback = (resolve, reject) => (error, response) => {
-    if (error || response.error) {
-      reject(error || response.error)
-    } else {
-      resolve(response.result)
-    }
-  }
+/**
+ * EIP-1102 eth_requestAccounts
+ * Implemented here to remain EIP-1102-compliant with ocap permissions.
+ */
+MetamaskInpageProvider.prototype._requestAccounts = function () {
+  const self = this
 
   return new Promise((resolve, reject) => {
-    self.sendAsync(
+    self._sendAsync(
       {
         jsonrpc: '2.0',
         method: 'wallet_requestPermissions',
-        params: [{ eth_requestAccounts: {} }],
+        params: [{ eth_accounts: {} }],
       },
       promiseCallback(resolve, reject)
     )
   })
   .then(() => {
     return new Promise((resolve, reject) => {
-      self.sendAsync(
+      self._sendAsync(
         {
-          method: 'eth_requestAccounts',
+          method: 'eth_accounts',
         },
-        promiseCallback(resolve, reject)
+        (error, response) => {
+          if (error || response.error) {
+            reject(error || response.error)
+          } else if (
+            !Array.isArray(response.result) || response.result.length < 1
+          ) {
+            reject('No accounts available.') // TODO:bug handle gracefully
+          } else {
+            resolve(response.result)
+          }
+        }
       )
     })
   })
 }
 
+/**
+ * EIP-1193 send, with backwards compatibility.
+ */
 MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallback) {
   const self = this
 
@@ -159,7 +185,7 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
     typeof methodOrPayload === 'object' &&
     typeof paramsOrCallback === 'function'
   ) {
-    self.sendAsync(payload, callback)
+    self._sendAsync(payload, callback)
     return
   }
   
@@ -178,22 +204,20 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
     params = paramsOrCallback
   } else {
     // throw not-supported error
-    const link = 'https://eips.ethereum.org/EIPS/eip-1193'
-    const message = `The MetaMask Web3 object does not support your given parameters. Please use ethereum.send(method: string, params: Array<any>). See ${link} for details.`
-    throw new Error(message)
+    throw new Error(
+      `The MetaMask Ethereum provider does not support your given parameters. Please use ethereum.send(method: string, params: Array<any>). For more details, see: https://eips.ethereum.org/EIPS/eip-1193`
+    )
   }
 
   if (!Array.isArray(params)) params = undefined
 
+  if (method === 'eth_requestAccounts') return self._requestAccounts()
+
   return new Promise((resolve, reject) => {
     try {
-      self.sendAsync(
+      self._sendAsync(
         { id: 1, jsonrpc: '2.0', method, params },
-        (error, response) => {
-          error || response.error
-          ? reject(error)
-          : resolve(response)
-        }
+        promiseCallback(resolve, reject)
       )
     } catch (error) {
       reject(error)
@@ -201,13 +225,31 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
   })
 }
 
-// handle sendAsync requests via asyncProvider
-// also remap ids inbound and outbound
+/**
+ * Web3 1.0 backwards compatibility method.
+ */
 MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
+  const self = this
+  console.warn('MetaMask: ethereum.sendAsync(...) is deprecated and may be removed in the future. Please use ethereum.send(method: string, params: Array<any>). For more details, see: https://eips.ethereum.org/EIPS/eip-1193')
+  self._sendAsync(payload, cb)
+}
+
+/**
+ * Internal RPC method. Forwards requests to background via the RPC engine.
+ * Also remap ids inbound and outbound.
+ */
+MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
   const self = this
 
   if (payload.method === 'eth_signTypedData') {
     console.warn('MetaMask: This experimental version of eth_signTypedData will be deprecated in the next release in favor of the standard as defined in EIP-712. See https://git.io/fNzPl for more information on the new standard.')
+  }
+
+  if (payload.method === 'eth_requestAccounts') {
+    self._requestAccounts()
+      .then(result => cb(null, result))
+      .catch(error => cb(error, null))
+    return
   }
 
   self.rpcEngine.handle(payload, cb)
