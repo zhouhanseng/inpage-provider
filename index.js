@@ -8,6 +8,7 @@ const asStream = require('obs-store/lib/asStream')
 const ObjectMultiplex = require('obj-multiplex')
 const util = require('util')
 const SafeEventEmitter = require('safe-event-emitter')
+const { getSiteMetadata, createObjectTransformStream } = require('./siteMetadata')
 
 module.exports = MetamaskInpageProvider
 
@@ -15,6 +16,10 @@ util.inherits(MetamaskInpageProvider, SafeEventEmitter)
 
 function MetamaskInpageProvider (connectionStream) {
   const self = this
+
+  document.addEventListener('DOMContentLoaded', () => {
+    self._siteMetadata = getSiteMetadata()
+  })
 
   // TODO:1193
   // self._isConnected = undefined
@@ -64,10 +69,20 @@ function MetamaskInpageProvider (connectionStream) {
   // ignore phishing warning message (handled elsewhere)
   mux.ignoreStream('phishing')
 
+  const metadataTransformStream = createObjectTransformStream(obj => {
+    obj._siteMetadata = (
+      self._siteMetadata
+      ? self._siteMetadata
+      : { name: null, icon: null }
+    )
+    return obj
+  })
+
   // connect to async provider
   const jsonRpcConnection = createJsonRpcStream()
   pump(
     jsonRpcConnection.stream,
+    metadataTransformStream, // add site metadata to outbound requests
     mux.createStream('provider'),
     jsonRpcConnection.stream,
     logStreamDisconnectWarning.bind(this, 'MetaMask RpcProvider')

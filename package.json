@@ -28,7 +28,8 @@
     "obj-multiplex": "^1.0.0",
     "obs-store": "^4.0.1",
     "pump": "^3.0.0",
-    "safe-event-emitter": "^1.0.1"
+    "safe-event-emitter": "^1.0.1",
+    "through2": "^2.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.3.4"
