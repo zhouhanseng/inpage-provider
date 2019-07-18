@@ -50,8 +50,20 @@ function MetamaskInpageProvider (connectionStream) {
     }
   })
 
-  this.remote = connectCapnode(mux)
-  this.setupCapIndex(this.remote)
+  const capStream = mux.createStream('cap')
+  const [capnode, remote] = connectCapnode()
+  pump(
+    remote,
+    capStream,
+    remote,
+    (err) => {
+      console.log('Problem with cap stream', err);
+    }
+  )
+
+  this.requestIndex = () => {
+    return capnode.requestIndex(remote);
+  }
 
   pump(
     mux.createStream('publicConfig'),
@@ -173,10 +185,6 @@ function logStreamDisconnectWarning (remoteLabel, err) {
   if (listeners > 0) {
     this.emit('error', warningMsg)
   }
-}
-
-MetamaskInpageProvider.prototype.setupCapIndex = function () {
-  this.index = this.capnode.requestIndex(this.remote)
 }
 
 function noop () {}
