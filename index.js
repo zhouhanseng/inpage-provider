@@ -8,6 +8,7 @@ const asStream = require('obs-store/lib/asStream')
 const ObjectMultiplex = require('obj-multiplex')
 const util = require('util')
 const SafeEventEmitter = require('safe-event-emitter')
+const connectCapnode = require('./lib/connectCapnode')
 
 module.exports = MetamaskInpageProvider
 
@@ -48,6 +49,9 @@ function MetamaskInpageProvider (connectionStream) {
       self.emit('networkChanged', state.networkVersion)
     }
   })
+
+  this.remote = connectCapnode(mux)
+  this.setupCapIndex(this.remote)
 
   pump(
     mux.createStream('publicConfig'),
@@ -169,6 +173,10 @@ function logStreamDisconnectWarning (remoteLabel, err) {
   if (listeners > 0) {
     this.emit('error', warningMsg)
   }
+}
+
+MetamaskInpageProvider.prototype.setupCapIndex = function () {
+  this.index = this.capnode.requestIndex(this.remote)
 }
 
 function noop () {}
