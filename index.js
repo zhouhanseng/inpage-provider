@@ -171,6 +171,7 @@ MetamaskInpageProvider.prototype._requestAccounts = function () {
       )
     })
   })
+  .catch(error => error)
 }
 
 /**
@@ -209,14 +210,17 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
     )
   }
 
-  if (!Array.isArray(params)) params = undefined
+  if (!Array.isArray(params)) {
+    if (params) params = [params]
+    else params = []
+  }
 
   if (method === 'eth_requestAccounts') return self._requestAccounts()
 
   return new Promise((resolve, reject) => {
     try {
       self._sendAsync(
-        { id: 1, jsonrpc: '2.0', method, params },
+        { jsonrpc: '2.0', method, params },
         promiseCallback(resolve, reject)
       )
     } catch (error) {
