@@ -23,11 +23,11 @@ function createObjectTransformStream (transformFunction) {
  * Gets site metadata and returns it
  *
  */
-function getSiteMetadata () {
+async function getSiteMetadata () {
   // get metadata
   const metadata = {
     name: getSiteName(window),
-    icon: getSiteIcon(window),
+    icon: await getSiteIcon(window),
   }
   return metadata
 }
@@ -37,6 +37,7 @@ function getSiteMetadata () {
  */
 function getSiteName (window) {
   const document = window.document
+
   const siteName = document.querySelector('head > meta[property="og:site_name"]')
   if (siteName) {
     return siteName.content
@@ -47,26 +48,39 @@ function getSiteName (window) {
     return metaTitle.content
   }
 
-  return document.title
+  if (document.title && document.title.length > 0) return document.title
+
+  return window.location.hostname
 }
 
 /**
  * Extracts an icon for the site from the DOM
  */
-function getSiteIcon (window) {
+async function getSiteIcon (window) {
   const document = window.document
 
   // Use the site's favicon if it exists
-  const shortcutIcon = document.querySelector('head > link[rel="shortcut icon"]')
-  if (shortcutIcon) {
-    return shortcutIcon.href
+  let icon = document.querySelector('head > link[rel="shortcut icon"]')
+  if (icon) {
+    if (await resourceExists(icon.href)) return icon.href
   }
 
   // Search through available icons in no particular order
-  const icon = Array.from(document.querySelectorAll('head > link[rel="icon"]')).find((icon) => Boolean(icon.href))
+  icon = Array.from(document.querySelectorAll('head > link[rel="icon"]'))
+  .find((icon) => Boolean(icon.href))
   if (icon) {
-    return icon.href
+    if (await resourceExists(icon.href)) return icon.href
   }
 
   return null
+}
+
+/**
+ * Returns whether the given resource exists
+ * @param {string} url the url of the resource
+ */
+function resourceExists (url) {
+  return fetch(url)
+  .then(res => res.ok)
+  .catch(() => false)
 }

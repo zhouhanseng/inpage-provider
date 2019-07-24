@@ -23,8 +23,8 @@ const promiseCallback = (resolve, reject) => (error, response) => {
 function MetamaskInpageProvider (connectionStream) {
   const self = this
 
-  document.addEventListener('DOMContentLoaded', () => {
-    self._siteMetadata = getSiteMetadata()
+  document.addEventListener('DOMContentLoaded', async () => {
+    self._siteMetadata = await getSiteMetadata()
   })
 
   // TODO:1193
@@ -79,7 +79,7 @@ function MetamaskInpageProvider (connectionStream) {
     obj._siteMetadata = (
       self._siteMetadata
       ? self._siteMetadata
-      : { name: null, icon: null }
+      : { name: window.location.hostname, icon: null }
     )
     return obj
   })
@@ -163,7 +163,7 @@ MetamaskInpageProvider.prototype._requestAccounts = function () {
           } else if (
             !Array.isArray(response.result) || response.result.length < 1
           ) {
-            reject('No accounts available.') // TODO:bug handle gracefully
+            reject('No accounts available.')
           } else {
             resolve(response.result)
           }
@@ -189,7 +189,7 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
     self._sendAsync(payload, callback)
     return
   }
-  
+
   // Per our docs as of <= 5/31/2019, send accepts a payload and returns
   // a promise, however per EIP-1193, send should accept a method string
   // and params array. Here we support both.
