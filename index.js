@@ -20,6 +20,19 @@ const promiseCallback = (resolve, reject) => (error, response) => {
   : resolve(response)
 }
 
+const ethAccountsCallback = (resolve, reject) => (error, response) => {
+  if (error || response.error) {
+    reject(error || response.error)
+  } else if (
+    !Array.isArray(response.result) || response.result.length === 0
+  ) {
+    // TODO: how should we throw this error? we want to use error codes
+    reject('No accounts available.')
+  } else {
+    resolve(response.result)
+  }
+}
+
 function MetamaskInpageProvider (connectionStream) {
   const self = this
 
@@ -49,7 +62,7 @@ function MetamaskInpageProvider (connectionStream) {
   // subscribe to metamask public config (one-way)
   self.publicConfigStore = new LocalStorageStore({ storageKey: 'MetaMask-Config' })
 
-  // TODO:synchronous
+  // TODO:1193
   // // Emit events for some state changes
   // self.publicConfigStore.subscribe(function (state) {
 
@@ -137,6 +150,7 @@ MetamaskInpageProvider.prototype.enable = function () {
 /**
  * EIP-1102 eth_requestAccounts
  * Implemented here to remain EIP-1102-compliant with ocap permissions.
+ * Attempts to call eth_accounts before requesting the permission.
  */
 MetamaskInpageProvider.prototype._requestAccounts = function () {
   const self = this
@@ -144,34 +158,37 @@ MetamaskInpageProvider.prototype._requestAccounts = function () {
   return new Promise((resolve, reject) => {
     self._sendAsync(
       {
-        jsonrpc: '2.0',
-        method: 'wallet_requestPermissions',
-        params: [{ eth_accounts: {} }],
+        method: 'eth_accounts',
       },
-      promiseCallback(resolve, reject)
+      ethAccountsCallback(resolve, reject)
     )
   })
-  .then(() => {
-    return new Promise((resolve, reject) => {
-      self._sendAsync(
-        {
-          method: 'eth_accounts',
-        },
-        (error, response) => {
-          if (error || response.error) {
-            reject(error || response.error)
-          } else if (
-            !Array.isArray(response.result) || response.result.length < 1
-          ) {
-            reject('No accounts available.')
-          } else {
-            resolve(response.result)
-          }
-        }
-      )
-    })
+  .catch(error => {
+    if (error.code === 1) { // if it's an rpc-cap auth error
+      return new Promise((resolve, reject) => {
+        self._sendAsync(
+          {
+            jsonrpc: '2.0',
+            method: 'wallet_requestPermissions',
+            params: [{ eth_accounts: {} }],
+          },
+          promiseCallback(resolve, reject)
+        )
+      })
+      .then(() => {
+        return new Promise((resolve, reject) => {
+          self._sendAsync(
+            {
+              method: 'eth_accounts',
+            },
+            ethAccountsCallback(resolve, reject)
+          )
+        })
+      })
+    } else {
+      throw error
+    }
   })
-  .catch(error => error)
 }
 
 /**
