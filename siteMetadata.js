@@ -1,22 +1,6 @@
 
-const Through = require('through2')
-
 module.exports = {
   getSiteMetadata,
-  createObjectTransformStream,
-}
-
-/**
- * Returns a transform stream that applies some transform function to objects
- * passing through.
- * @param {function} transformFunction the function transforming the object
- * @return {stream.Transform}
- */
-function createObjectTransformStream (transformFunction) {
-  return Through.obj(function (obj, _, cb) {
-    this.push(transformFunction(obj))
-    cb()
-  })
 }
 
 /**
@@ -24,12 +8,10 @@ function createObjectTransformStream (transformFunction) {
  *
  */
 async function getSiteMetadata () {
-  // get metadata
-  const metadata = {
+  return {
     name: getSiteName(window),
     icon: await getSiteIcon(window),
   }
-  return metadata
 }
 
 /**
@@ -48,7 +30,9 @@ function getSiteName (window) {
     return metaTitle.content
   }
 
-  if (document.title && document.title.length > 0) return document.title
+  if (document.title && document.title.length > 0) {
+    return document.title
+  }
 
   return window.location.hostname
 }
@@ -61,15 +45,15 @@ async function getSiteIcon (window) {
 
   // Use the site's favicon if it exists
   let icon = document.querySelector('head > link[rel="shortcut icon"]')
-  if (icon) {
-    if (await resourceExists(icon.href)) return icon.href
+  if (icon && await resourceExists(icon.href)) {
+    return icon.href
   }
 
   // Search through available icons in no particular order
   icon = Array.from(document.querySelectorAll('head > link[rel="icon"]'))
   .find((icon) => Boolean(icon.href))
-  if (icon) {
-    if (await resourceExists(icon.href)) return icon.href
+  if (icon && await resourceExists(icon.href)) {
+    return icon.href
   }
 
   return null
@@ -80,7 +64,7 @@ async function getSiteIcon (window) {
  * @param {string} url the url of the resource
  */
 function resourceExists (url) {
-  return fetch(url)
-  .then(res => res.ok)
-  .catch(() => false)
+  return fetch(url, { method: 'HEAD', mode: 'same-origin' })
+  .then(res => res.status === 200)
+  .catch(_ => false)
 }

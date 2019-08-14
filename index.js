@@ -6,35 +6,31 @@ const createJsonRpcStream = require('json-rpc-middleware-stream')
 const LocalStorageStore = require('obs-store')
 const asStream = require('obs-store/lib/asStream')
 const ObjectMultiplex = require('obj-multiplex')
-const util = require('util')
+const { inherits } = require('util')
 const SafeEventEmitter = require('safe-event-emitter')
-const { getSiteMetadata, createObjectTransformStream } = require('./siteMetadata')
+
+const { getSiteMetadata } = require('./siteMetadata')
+const {
+  createObjectTransformStream,
+  logStreamDisconnectWarning,
+  promiseCallback,
+} = require('./utils')
+const warnings = require('warnings.json')
 
 module.exports = MetamaskInpageProvider
 
-util.inherits(MetamaskInpageProvider, SafeEventEmitter)
-
-const promiseCallback = (resolve, reject) => (error, response) => {
-  error || response.error
-  ? reject(error || response.error)
-  : resolve(response)
-}
-
-const ethAccountsCallback = (resolve, reject) => (error, response) => {
-  if (error || response.error) {
-    reject(error || response.error)
-  } else if (
-    !Array.isArray(response.result) || response.result.length === 0
-  ) {
-    // TODO: how should we throw this error? we want to use error codes
-    reject('No accounts available.')
-  } else {
-    resolve(response.result)
-  }
-}
+inherits(MetamaskInpageProvider, SafeEventEmitter)
 
 function MetamaskInpageProvider (connectionStream) {
   const self = this
+
+  self.state = {
+    sentWarnings: {
+      enable: false,
+      sendAsync: false,
+      signTypedData: false,
+    },
+  }
 
   document.addEventListener('DOMContentLoaded', async () => {
     self._siteMetadata = await getSiteMetadata()
@@ -88,13 +84,13 @@ function MetamaskInpageProvider (connectionStream) {
   // ignore phishing warning message (handled elsewhere)
   mux.ignoreStream('phishing')
 
-  const metadataTransformStream = createObjectTransformStream(obj => {
-    obj._siteMetadata = (
+  const metadataTransformStream = createObjectTransformStream(req => {
+    req._siteMetadata = (
       self._siteMetadata
       ? self._siteMetadata
       : { name: window.location.hostname, icon: null }
     )
-    return obj
+    return req
   })
 
   // connect to async provider
@@ -143,7 +139,10 @@ function MetamaskInpageProvider (connectionStream) {
  */
 MetamaskInpageProvider.prototype.enable = function () {
   const self = this
-  console.warn('MetaMask: ethereum.enable() is deprecated and may be removed in the future. Please use ethereum.send(\'eth_requestAccounts\'). For more details, see: https://eips.ethereum.org/EIPS/eip-1102')
+  if (!self.state.sentWarnings.enable) {
+    console.warn(warnings.enableDeprecation)
+    self.state.sentWarnings.enable = true
+  }
   return self._requestAccounts()
 }
 
@@ -160,7 +159,7 @@ MetamaskInpageProvider.prototype._requestAccounts = function () {
       {
         method: 'eth_accounts',
       },
-      ethAccountsCallback(resolve, reject)
+      promiseCallback(resolve, reject)
     )
   })
   .catch(error => {
@@ -181,7 +180,7 @@ MetamaskInpageProvider.prototype._requestAccounts = function () {
             {
               method: 'eth_accounts',
             },
-            ethAccountsCallback(resolve, reject)
+            promiseCallback(resolve, reject)
           )
         })
       })
@@ -251,7 +250,10 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
  */
 MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
   const self = this
-  console.warn('MetaMask: ethereum.sendAsync(...) is deprecated and may be removed in the future. Please use ethereum.send(method: string, params: Array<any>). For more details, see: https://eips.ethereum.org/EIPS/eip-1193')
+  if (!self.state.sentWarnings.sendAsync) {
+    console.warn(warnings.sendAsyncDeprecation)
+    self.state.sentWarnings.sendAsync = true
+  }
   self._sendAsync(payload, cb)
 }
 
@@ -262,18 +264,25 @@ MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
 MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
   const self = this
 
-  if (payload.method === 'eth_signTypedData') {
-    console.warn('MetaMask: This experimental version of eth_signTypedData will be deprecated in the next release in favor of the standard as defined in EIP-712. See https://git.io/fNzPl for more information on the new standard.')
+  if (!self.state.sentMetadata) {
+    self.state.sentMetadata = true
+  }
+
+  if (
+    payload.method === 'eth_signTypedData' &&
+    !self.state.sentWarnings.signTypedData
+  ) {
+    console.warn(warnings.signTypedDataDeprecation)
+    self.state.sentWarnings.signTypedData = true
   }
 
   if (payload.method === 'eth_requestAccounts') {
     self._requestAccounts()
       .then(result => cb(null, result))
       .catch(error => cb(error, null))
-    return
+  } else {
+    self.rpcEngine.handle(payload, cb)
   }
-
-  self.rpcEngine.handle(payload, cb)
 }
 
 MetamaskInpageProvider.prototype.isConnected = function () {
@@ -292,15 +301,3 @@ MetamaskInpageProvider.prototype.isMetaMask = true
 //   }
 //   this._isConnected = false
 // }
-
-// util
-
-function logStreamDisconnectWarning (remoteLabel, err) {
-  let warningMsg = `MetamaskInpageProvider - lost connection to ${remoteLabel}`
-  if (err) warningMsg += '\n' + err.stack
-  console.warn(warningMsg)
-  const listeners = this.listenerCount('error')
-  if (listeners > 0) {
-    this.emit('error', warningMsg)
-  }
-}
