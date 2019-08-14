@@ -1,6 +1,6 @@
+
 const pump = require('pump')
 const RpcEngine = require('json-rpc-engine')
-const createErrorMiddleware = require('./createErrorMiddleware')
 const createIdRemapMiddleware = require('json-rpc-engine/src/idRemapMiddleware')
 const createJsonRpcStream = require('json-rpc-middleware-stream')
 const LocalStorageStore = require('obs-store')
@@ -9,13 +9,13 @@ const ObjectMultiplex = require('obj-multiplex')
 const { inherits } = require('util')
 const SafeEventEmitter = require('safe-event-emitter')
 
-const { getSiteMetadata } = require('./siteMetadata')
+const { sendSiteMetadata } = require('./siteMetadata')
 const {
-  createObjectTransformStream,
+  createErrorMiddleware,
   logStreamDisconnectWarning,
   promiseCallback,
 } = require('./utils')
-const warnings = require('warnings.json')
+const warnings = require('./warnings.json')
 
 module.exports = MetamaskInpageProvider
 
@@ -30,11 +30,8 @@ function MetamaskInpageProvider (connectionStream) {
       sendAsync: false,
       signTypedData: false,
     },
+    sentSiteMetadata: false,
   }
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    self._siteMetadata = await getSiteMetadata()
-  })
 
   // TODO:1193
   // self._isConnected = undefined
@@ -84,20 +81,10 @@ function MetamaskInpageProvider (connectionStream) {
   // ignore phishing warning message (handled elsewhere)
   mux.ignoreStream('phishing')
 
-  const metadataTransformStream = createObjectTransformStream(req => {
-    req._siteMetadata = (
-      self._siteMetadata
-      ? self._siteMetadata
-      : { name: window.location.hostname, icon: null }
-    )
-    return req
-  })
-
   // connect to async provider
   const jsonRpcConnection = createJsonRpcStream()
   pump(
     jsonRpcConnection.stream,
-    metadataTransformStream, // add site metadata to outbound requests
     mux.createStream('provider'),
     jsonRpcConnection.stream,
     logStreamDisconnectWarning.bind(this, 'MetaMask RpcProvider')
@@ -264,8 +251,9 @@ MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
 MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
   const self = this
 
-  if (!self.state.sentMetadata) {
-    self.state.sentMetadata = true
+  if (!self.state.sentSiteMetadata) {
+    sendSiteMetadata(self.rpcEngine)
+    self.state.sentSiteMetadata = true
   }
 
   if (
@@ -276,13 +264,7 @@ MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
     self.state.sentWarnings.signTypedData = true
   }
 
-  if (payload.method === 'eth_requestAccounts') {
-    self._requestAccounts()
-      .then(result => cb(null, result))
-      .catch(error => cb(error, null))
-  } else {
-    self.rpcEngine.handle(payload, cb)
-  }
+  self.rpcEngine.handle(payload, cb)
 }
 
 MetamaskInpageProvider.prototype.isConnected = function () {

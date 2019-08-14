@@ -1,6 +1,27 @@
 
 module.exports = {
-  getSiteMetadata,
+  sendSiteMetadata,
+}
+
+/**
+ * Sends site metadata over an RPC request.
+ */
+async function sendSiteMetadata (engine) {
+  try {
+    const siteMetadata = await getSiteMetadata()
+    engine.handle(
+      {
+        method: 'metamask_sendSiteMetadata',
+        siteMetadata,
+      },
+      () => {}
+    )
+  } catch (error) {
+    console.error({
+      message: 'Failed to send site metadata',
+      originalError: error,
+    })
+  }
 }
 
 /**

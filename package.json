@@ -23,14 +23,13 @@
   "homepage": "https://github.com/MetaMask/metamask-inpage-provider#readme",
   "dependencies": {
     "eth-json-rpc-errors": "^0.3.1",
-    "json-rpc-engine": "^5.1.1",
+    "json-rpc-engine": "github:metamask/json-rpc-engine",
     "json-rpc-middleware-stream": "^2.1.1",
     "loglevel": "^1.6.1",
     "obj-multiplex": "^1.0.0",
-    "obs-store": "^4.0.1",
+    "obs-store": "github:rekmarks/obs-store#babelify",
     "pump": "^3.0.0",
-    "safe-event-emitter": "^1.0.1",
-    "through2": "^2.0.3"
+    "safe-event-emitter": "^1.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.3.4"

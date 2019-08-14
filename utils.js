@@ -1,17 +1,29 @@
 
-const through = require('through2')
+const log = require('loglevel')
+const { serializeError } = require('eth-json-rpc-errors')
 
 /**
- * Returns a transform stream that applies some transform function to objects
- * passing through.
- * @param {function} transformFunction the function transforming the object
- * @return {stream.Transform}
+ * Middleware configuration object
+ *
+ * @typedef {Object} MiddlewareConfig
  */
-function createObjectTransformStream (transformFunction) {
-  return through.obj(function (obj, _, cb) {
-    this.push(transformFunction(obj))
-    cb()
-  })
+
+/**
+ * json-rpc-engine middleware that both logs standard and non-standard error
+ * messages and ends middleware stack traversal if an error is encountered
+ *
+ * @returns {Function} json-rpc-engine middleware function
+ */
+function createErrorMiddleware () {
+  return (_, res, next) => {
+    next(done => {
+      const { error } = res
+      if (!error) { return done() }
+      serializeError(error)
+      log.error(`MetaMask - RPC Error: ${error.message}`, error)
+      done()
+    })
+  }
 }
 
 function logStreamDisconnectWarning (remoteLabel, err) {
@@ -31,7 +43,7 @@ const promiseCallback = (resolve, reject) => (error, response) => {
 }
 
 module.exports = {
-  createObjectTransformStream,
+  createErrorMiddleware,
   logStreamDisconnectWarning,
   promiseCallback,
 }
