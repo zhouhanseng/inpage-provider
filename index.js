@@ -8,6 +8,7 @@ const asStream = require('obs-store/lib/asStream')
 const ObjectMultiplex = require('obj-multiplex')
 const { inherits } = require('util')
 const SafeEventEmitter = require('safe-event-emitter')
+const uuid = require('uuid/v4')
 
 const { sendSiteMetadata } = require('./siteMetadata')
 const {
@@ -15,7 +16,7 @@ const {
   logStreamDisconnectWarning,
   promiseCallback,
 } = require('./utils')
-const warnings = require('./warnings.json')
+const messages = require('./messages.json')
 
 module.exports = MetamaskInpageProvider
 
@@ -127,7 +128,7 @@ function MetamaskInpageProvider (connectionStream) {
 MetamaskInpageProvider.prototype.enable = function () {
   const self = this
   if (!self.state.sentWarnings.enable) {
-    console.warn(warnings.enableDeprecation)
+    console.warn(messages.warnings.enableDeprecation)
     self.state.sentWarnings.enable = true
   }
   return self._requestAccounts()
@@ -207,10 +208,8 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
     method = methodOrPayload
     params = paramsOrCallback
   } else {
-    // throw not-supported error
-    throw new Error(
-      `The MetaMask Ethereum provider does not support your given parameters. Please use ethereum.send(method: string, params: Array<any>). For more details, see: https://eips.ethereum.org/EIPS/eip-1193`
-    )
+    // throw invalid params error
+    throw new Error(messages.errors.invalidParams)
   }
 
   if (!Array.isArray(params)) {
@@ -238,7 +237,7 @@ MetamaskInpageProvider.prototype.send = function (methodOrPayload, paramsOrCallb
 MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
   const self = this
   if (!self.state.sentWarnings.sendAsync) {
-    console.warn(warnings.sendAsyncDeprecation)
+    console.warn(messages.warnings.sendAsyncDeprecation)
     self.state.sentWarnings.sendAsync = true
   }
   self._sendAsync(payload, cb)
@@ -260,9 +259,11 @@ MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
     payload.method === 'eth_signTypedData' &&
     !self.state.sentWarnings.signTypedData
   ) {
-    console.warn(warnings.signTypedDataDeprecation)
+    console.warn(messages.warnings.signTypedDataDeprecation)
     self.state.sentWarnings.signTypedData = true
   }
+
+  if (!payload.id) payload.id = uuid()
 
   self.rpcEngine.handle(payload, cb)
 }
