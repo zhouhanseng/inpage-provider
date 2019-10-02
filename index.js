@@ -150,30 +150,32 @@ MetamaskInpageProvider.prototype._requestAccounts = function () {
       promiseCallback(resolve, reject)
     )
   })
-  .catch(error => {
-    if (error.code === 1) { // if it's an rpc-cap auth error
-      return new Promise((resolve, reject) => {
-        self._sendAsync(
-          {
-            jsonrpc: '2.0',
-            method: 'wallet_requestPermissions',
-            params: [{ eth_accounts: {} }],
-          },
-          promiseCallback(resolve, reject)
-        )
-      })
-      .then(() => {
+  .then(response => {
+    if (Array.isArray(response.result)) {
+      if (response.result.length === 0) {
         return new Promise((resolve, reject) => {
           self._sendAsync(
             {
-              method: 'eth_accounts',
+              jsonrpc: '2.0',
+              method: 'wallet_requestPermissions',
+              params: [{ eth_accounts: {} }],
             },
             promiseCallback(resolve, reject)
           )
         })
-      })
-    } else {
-      throw error
+        .then(() => {
+          return new Promise((resolve, reject) => {
+            self._sendAsync(
+              {
+                method: 'eth_accounts',
+              },
+              promiseCallback(resolve, reject)
+            )
+          })
+        })
+      } else {
+        return response.result
+      }
     }
   })
 }
@@ -247,8 +249,9 @@ MetamaskInpageProvider.prototype.sendAsync = function (payload, cb) {
  * Internal RPC method. Forwards requests to background via the RPC engine.
  * Also remap ids inbound and outbound.
  */
-MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
+MetamaskInpageProvider.prototype._sendAsync = function (payload, userCallback) {
   const self = this
+  let cb = userCallback
 
   if (!self.state.sentSiteMetadata) {
     sendSiteMetadata(self.rpcEngine)
@@ -261,6 +264,21 @@ MetamaskInpageProvider.prototype._sendAsync = function (payload, cb) {
   ) {
     console.warn(messages.warnings.signTypedDataDeprecation)
     self.state.sentWarnings.signTypedData = true
+
+  // legacy eth_accounts behavior
+  } else if (payload.method === 'eth_accounts') {
+    cb = (err, res) => {
+      if (err) {
+        let code = err.code || res.error.code
+        // if error is unauthorized or userRejectedRequest
+        if (code === 4100) {
+          delete res.error
+          res.result = []
+          return userCallback(null, res)
+        }
+      }
+      userCallback(err, res)
+    }
   }
 
   if (!payload.id) payload.id = uuid()
