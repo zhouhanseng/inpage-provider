@@ -47,7 +47,7 @@ function logStreamDisconnectWarning (remoteLabel, err) {
 const promiseCallback = (resolve, reject) => (error, response) => {
   error || response.error
   ? reject(error || response.error)
-  : resolve(response)
+  : resolve(response.result)
 }
 
 module.exports = {

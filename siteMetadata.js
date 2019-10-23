@@ -8,11 +8,11 @@ module.exports = {
  */
 async function sendSiteMetadata (engine) {
   try {
-    const siteMetadata = await getSiteMetadata()
+    const domainMetadata = await getSiteMetadata()
     engine.handle(
       {
-        method: 'metamask_sendSiteMetadata',
-        siteMetadata,
+        method: 'wallet_sendDomainMetadata',
+        domainMetadata,
       },
       () => {}
     )
