@@ -30,7 +30,5 @@
     "pump": "^3.0.0",
     "safe-event-emitter": "^1.0.1"
   },
-  "devDependencies": {
-    "@babel/core": "^7.5.5"
-  }
+  "devDependencies": {}
 }
