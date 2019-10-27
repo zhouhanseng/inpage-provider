@@ -3,7 +3,7 @@ const RpcEngine = require('json-rpc-engine')
 const createErrorMiddleware = require('./createErrorMiddleware')
 const createIdRemapMiddleware = require('json-rpc-engine/src/idRemapMiddleware')
 const createJsonRpcStream = require('json-rpc-middleware-stream')
-const LocalStorageStore = require('obs-store')
+const ObservableStore = require('obs-store')
 const asStream = require('obs-store/lib/asStream')
 const ObjectMultiplex = require('obj-multiplex')
 const util = require('util')
@@ -18,6 +18,7 @@ function MetamaskInpageProvider (connectionStream) {
   const self = this
   self.selectedAddress = undefined
   self.networkVersion = undefined
+  self.chainId = undefined
 
   // super constructor
   SafeEventEmitter.call(self)
@@ -32,7 +33,7 @@ function MetamaskInpageProvider (connectionStream) {
   )
 
   // subscribe to metamask public config (one-way)
-  self.publicConfigStore = new LocalStorageStore({ storageKey: 'MetaMask-Config' })
+  self.publicConfigStore = new ObservableStore({ storageKey: 'MetaMask-Config' })
 
   // Emit events for some state changes
   self.publicConfigStore.subscribe(function (state) {
@@ -40,13 +41,22 @@ function MetamaskInpageProvider (connectionStream) {
     // Emit accountsChanged event on account change
     if ('selectedAddress' in state && state.selectedAddress !== self.selectedAddress) {
       self.selectedAddress = state.selectedAddress
-      self.emit('accountsChanged', [self.selectedAddress])
+      const accounts = state.selectedAddress ?
+        [state.selectedAddress] :
+        []
+      self.emit('accountsChanged', accounts)
     }
 
     // Emit networkChanged event on network change
     if ('networkVersion' in state && state.networkVersion !== self.networkVersion) {
       self.networkVersion = state.networkVersion
       self.emit('networkChanged', state.networkVersion)
+    }
+
+    // Emit networkChanged event on network change
+    if ('chainId' in state && state.chainId !== self.chainId) {
+      self.chainId = state.chainId
+      self.emit('chainIdChanged', state.chainId)
     }
   })
 
