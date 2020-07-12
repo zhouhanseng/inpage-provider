@@ -8,6 +8,7 @@ const dequal = require('fast-deep-equal')
 const { ethErrors } = require('eth-json-rpc-errors')
 const log = require('loglevel')
 
+const connectCapnode = require('./connectCapnode')
 const messages = require('./messages')
 const { sendSiteMetadata } = require('./siteMetadata')
 const {
@@ -100,6 +101,22 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
       connectionStream,
       this._handleDisconnect.bind(this, 'MetaMask'),
     )
+
+    // setup capnode
+    const capStream = mux.createStream('cap')
+    const [capnode, capRemote] = connectCapnode()
+    pump(
+      capRemote,
+      capStream,
+      capRemote,
+      (err) => {
+        console.error('Problem with cap stream', err)
+      },
+    )
+
+    this.requestIndex = () => {
+      return capnode.requestIndex(capRemote)
+    }
 
     // ignore phishing warning message (handled elsewhere)
     mux.ignoreStream('phishing')
