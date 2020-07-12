@@ -65,8 +65,6 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
           notification: false,
         },
         // misc
-        // TODO:deprecation:remove
-        autoReload: false,
       },
       isConnected: null,
       accounts: null,
@@ -197,29 +195,26 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
       window.addEventListener('DOMContentLoaded', domContentLoadedHandler)
     }
 
-    // TODO:deprecation:remove
-    this._web3Ref = undefined
-
-    // TODO:deprecation:remove
-    // give the dapps control of a refresh they can toggle this off on the window.ethereum
-    // this will be default true so it does not break any old apps.
-    this.autoRefreshOnNetworkChange = true
-
-    // TODO:deprecation:remove
-    // wait a second to attempt to send this, so that the warning can be silenced
-    // moved this here because there's another warning in .enable() discouraging
-    // the use thereof per EIP 1102
     setTimeout(() => {
-      if (this.autoRefreshOnNetworkChange && !this._state.sentWarnings.autoReload) {
-        log.warn(messages.warnings.autoReloadDeprecation)
-        this._state.sentWarnings.autoReload = true
-      }
-    }, 1000)
+      this.emit('connect')
+    })
   }
 
   //====================
   // Public Methods
   //====================
+
+  /**
+   * Returns whether the inpage provider is connected to MetaMask.
+   */
+  isConnected () {
+
+    if (!this._state.sentWarnings.isConnected) {
+      log.warn(messages.warnings.isConnectedDeprecation)
+      this._state.sentWarnings.isConnected = true
+    }
+    return this._state.isConnected
+  }
 
   /**
    * Experimental. The signature of this method may change without warning, pending EIP 1193.
@@ -413,18 +408,6 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
     if (this.selectedAddress !== _accounts[0]) {
       this.selectedAddress = _accounts[0] || null
     }
-
-    // TODO:deprecation:remove
-    // handle web3
-    if (this._web3Ref) {
-      this._web3Ref.defaultAccount = this.selectedAddress
-    } else if (
-      window.web3 &&
-      window.web3.eth &&
-      typeof window.web3.eth === 'object'
-    ) {
-      window.web3.eth.defaultAccount = this.selectedAddress
-    }
   }
 
   /**
@@ -455,7 +438,6 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
     if (chainId !== this.chainId || networkVersion !== this.networkVersion) {
       this.chainId = chainId
       this.emit('chainChanged', this.chainId)
-      this.emit('chainIdChanged', this.chainId) // TODO:deprecation:remove
 
       this.networkVersion = networkVersion
       this.emit('networkChanged', this.networkVersion)
@@ -545,32 +527,6 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
             )
           })
         },
-
-        // TODO:deprecation:remove isEnabled, isApproved
-        /**
-         * DEPRECATED. To be removed.
-         * Synchronously determines if this domain is currently enabled, with a potential false negative if called to soon
-         *
-         * @returns {boolean} - returns true if this domain is currently enabled
-         */
-        isEnabled: () => {
-          return Array.isArray(this._state.accounts) && this._state.accounts.length > 0
-        },
-
-        /**
-         * DEPRECATED. To be removed.
-         * Asynchronously determines if this domain is currently enabled
-         *
-         * @returns {Promise<boolean>} - Promise resolving to true if this domain is currently enabled
-         */
-        isApproved: async () => {
-          if (this._state.accounts === null) {
-            await new Promise(
-              (resolve) => this.once('accountsChanged', () => resolve()),
-            )
-          }
-          return Array.isArray(this._state.accounts) && this._state.accounts.length > 0
-        },
       },
       {
         get: (obj, prop) => {
@@ -588,19 +544,6 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
   //====================
   // Deprecated Methods
   //====================
-
-  /**
-   * DEPRECATED.
-   * Returns whether the inpage provider is connected to MetaMask.
-   */
-  isConnected () {
-
-    if (!this._state.sentWarnings.isConnected) {
-      log.warn(messages.warnings.isConnectedDeprecation)
-      this._state.sentWarnings.isConnected = true
-    }
-    return this._state.isConnected
-  }
 
   /**
    * DEPRECATED.

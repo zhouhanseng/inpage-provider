@@ -2,11 +2,9 @@ module.exports = {
   errors: {
     disconnected: () => `MetaMask: Lost connection to MetaMask background process.`,
     sendSiteMetadata: () => `MetaMask: Failed to send site metadata. This is an internal error, please report this bug.`,
-    unsupportedSync: (method) => `MetaMask: The MetaMask Web3 object does not support synchronous methods like ${method} without a callback parameter.`, // TODO:deprecation:remove
+    unsupportedSync: (method) => `MetaMask: The MetaMask Ethereum provider object does not support synchronous methods like ${method} without a callback parameter.`, // TODO:deprecation:remove
   },
   warnings: {
-    // TODO:deprecation:remove
-    autoReloadDeprecation: `MetaMask: MetaMask will soon stop reloading pages on network change.\nFor more information, see: https://medium.com/metamask/no-longer-reloading-pages-on-network-change-fbf041942b44 \nSet 'ethereum.autoRefreshOnNetworkChange' to 'false' to silence this warning: https://metamask.github.io/metamask-docs/API_Reference/Ethereum_Provider#ethereum.autorefreshonnetworkchange`,
     // deprecated methods
     enableDeprecation: `MetaMask: 'ethereum.enable()' is deprecated and will be removed in the future. Please use the 'eth_requestAccounts' RPC method instead.\nFor more information, see: https://eips.ethereum.org/EIPS/eip-1102`,
     isConnectedDeprecation: `MetaMask: 'ethereum.isConnected()' is deprecated and will be removed in the future. Please listen for the relevant events instead.\nFor more information, see: https://eips.ethereum.org/EIPS/eip-1193`,

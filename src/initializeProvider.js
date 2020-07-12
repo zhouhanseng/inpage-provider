@@ -8,8 +8,8 @@ module.exports = {
 
 const getDefaultConnectionStream = () => {
   return new PostMessageDuplexStream({
-    name: 'metamask-inpage',
-    target: 'metamask-contentscript',
+    name: 'inpage',
+    target: 'contentscript',
   })
 }
 
@@ -29,17 +29,9 @@ const getDefaultConnectionStream = () => {
 function initializeProvider ({
   connectionStream,
   maxEventListeners = 100,
-  protectProperties = true,
   shouldSendMetadata = true,
   shouldSetOnWindow = true,
 } = {}) {
-
-  // new properties as of v5.0.0
-  const PROTECTED_PROPERTIES = new Set([
-    'request',
-    '_rpcRequest',
-    '_rpcEngine',
-  ])
 
   const _connectionStream = connectionStream || getDefaultConnectionStream()
 
@@ -47,19 +39,10 @@ function initializeProvider ({
     _connectionStream, { shouldSendMetadata, maxEventListeners },
   )
 
-  if (protectProperties) {
-    // Some libraries, e.g. web3@1.x, mess with our API.
-    provider = new Proxy(provider, {
-      deleteProperty: () => true,
-      set: (target, prop, value, receiver) => {
-        if (PROTECTED_PROPERTIES.has(prop)) {
-          throw new Error(`MetaMask: Overwriting 'ethereum.${prop}' is forbidden.`)
-        } else {
-          return Reflect.set(target, prop, value, receiver)
-        }
-      },
-    })
-  }
+  provider = new Proxy(provider, {
+    // prevent e.g. web3@1.x from deleting our stuff
+    deleteProperty: () => true,
+  })
 
   if (shouldSetOnWindow) {
     setGlobalProvider(provider)

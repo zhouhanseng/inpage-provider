@@ -14,7 +14,6 @@ module.exports = {
   globals: {
     document: false,
     navigator: false,
-    web3: true,
     window: false,
     $: false,
     QUnit: false,
