@@ -32,7 +32,11 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
    */
   constructor (
     connectionStream,
-    { maxEventListeners = 100, shouldSendMetadata = true } = {},
+    {
+      maxEventListeners = 100,
+      shouldSendMetadata = true,
+      useCapnode = true,
+    } = {},
   ) {
 
     if (
@@ -100,20 +104,22 @@ module.exports = class MetamaskInpageProvider extends SafeEventEmitter {
       this._handleDisconnect.bind(this, 'MetaMask'),
     )
 
-    // setup capnode
-    const capStream = mux.createStream('cap')
-    const [capnode, capRemote] = connectCapnode()
-    pump(
-      capRemote,
-      capStream,
-      capRemote,
-      (err) => {
-        console.error('Problem with cap stream', err)
-      },
-    )
+    if (useCapnode) {
+      // setup capnode
+      const capStream = mux.createStream('cap')
+      const [capnode, capRemote] = connectCapnode()
+      pump(
+        capRemote,
+        capStream,
+        capRemote,
+        (err) => {
+          console.error('Problem with cap stream', err)
+        },
+      )
 
-    this.requestIndex = () => {
-      return capnode.requestIndex(capRemote)
+      this.requestIndex = () => {
+        return capnode.requestIndex(capRemote)
+      }
     }
 
     // ignore phishing warning message (handled elsewhere)
