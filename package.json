@@ -34,7 +34,7 @@
     "json-rpc-middleware-stream": "^2.1.1",
     "loglevel": "^1.6.1",
     "obj-multiplex": "^1.0.0",
-    "post-message-stream": "^3.0.0",
+    "post-message-stream": "rekmarks/post-message-stream#multi-env",
     "pump": "^3.0.0",
     "safe-event-emitter": "^1.0.1"
   },

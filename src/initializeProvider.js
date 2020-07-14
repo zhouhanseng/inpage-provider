@@ -1,4 +1,4 @@
-const PostMessageDuplexStream = require('post-message-stream')
+const { WindowPostMessageStream } = require('post-message-stream')
 const MetamaskInpageProvider = require('./MetamaskInpageProvider')
 
 module.exports = {
@@ -7,7 +7,7 @@ module.exports = {
 }
 
 const getDefaultConnectionStream = () => {
-  return new PostMessageDuplexStream({
+  return new WindowPostMessageStream({
     name: 'inpage',
     target: 'contentscript',
   })
