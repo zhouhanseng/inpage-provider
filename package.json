@@ -1,23 +1,23 @@
 {
-  "name": "@metamask/inpage-provider",
+  "name": "@zhouhancheng/inpage-provider",
   "version": "8.0.4",
   "description": "A JavaScript Ethereum provider that connects to the wallet over a stream.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --project .",
-    "test": "yarn build && jest",
+    "test": "pnpm run build && jest",
     "coverage": "jest --coverage",
     "lint": "eslint . --ext ts,js,json",
-    "lint:fix": "yarn lint --fix",
-    "prepublishOnly": "yarn require-clean-git && yarn lint && yarn test",
+    "lint:fix": "pnpm run lint --fix",
+    "prepublishOnly": "pnpm run require-clean-git && pnpm run lint && pnpm run test",
     "require-clean-git": "git diff --quiet || (echo 'Please clean the working directory.' && exit 1)"
   },
   "author": "MetaMask",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/MetaMask/inpage-provider.git"
+    "url": "git+ssh://git@github.com/zhouhancheng/inpage-provider.git"
   },
   "keywords": [
     "MetaMask",
@@ -25,9 +25,9 @@
     "Provider"
   ],
   "bugs": {
-    "url": "https://github.com/MetaMask/inpage-provider/issues"
+    "url": "https://github.com/zhouhancheng/inpage-provider/issues"
   },
-  "homepage": "https://github.com/MetaMask/inpage-provider#readme",
+  "homepage": "https://github.com/zhouhancheng/inpage-provider#readme",
   "files": [
     "dist/"
   ],

@@ -56,28 +56,6 @@ describe('MetaMaskInpageProvider: Miscellanea', () => {
       ).toThrow(messages.errors.invalidDuplexStream());
     });
 
-    it('throws if bad options are provided', () => {
-      const stream = new MockDuplexStream();
-
-      expect(
-        () => new MetaMaskInpageProvider(stream, null),
-      ).toThrow('Cannot destructure property `jsonRpcStreamName` of \'undefined\' or \'null\'');
-
-      expect(
-        () => new MetaMaskInpageProvider(stream, {
-          maxEventListeners: 10,
-          shouldSendMetadata: 'foo',
-        }),
-      ).toThrow(messages.errors.invalidOptions(10, 'foo'));
-
-      expect(
-        () => new MetaMaskInpageProvider(stream, {
-          maxEventListeners: 'foo',
-          shouldSendMetadata: true,
-        }),
-      ).toThrow(messages.errors.invalidOptions('foo', true));
-    });
-
     it('accepts valid custom logger', () => {
       const stream = new MockDuplexStream();
       const customLogger = {

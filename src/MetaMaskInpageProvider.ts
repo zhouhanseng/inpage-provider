@@ -673,11 +673,8 @@ export default class MetaMaskInpageProvider extends SafeEventEmitter {
       this._log.error('MetaMask: Received invalid isUnlocked parameter. Please report this bug.');
       return;
     }
-
-    if (isUnlocked !== this._state.isUnlocked) {
-      this._state.isUnlocked = isUnlocked;
-      this._handleAccountsChanged(accounts || []);
-    }
+    this._state.isUnlocked = isUnlocked;
+    this._handleAccountsChanged(accounts || []);
   }
 
   /**
