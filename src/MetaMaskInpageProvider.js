@@ -131,7 +131,7 @@ module.exports = class MetaMaskInpageProvider extends SafeEventEmitter {
     // handle isUnlocked changes, and chainChanged and networkChanged events
     this._publicConfigStore.subscribe((state) => {
 
-      if ('isUnlocked' in state && state.isUnlocked !== this._state.isUnlocked) {
+      if ('isUnlocked' in state) {
         this._state.isUnlocked = state.isUnlocked
         if (this._state.isUnlocked) {
           // this will get the exposed accounts, if any
