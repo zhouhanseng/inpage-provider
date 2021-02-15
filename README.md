@@ -4,8 +4,6 @@ The inpage Ethereum provider object injected by MetaMask into web pages.
 Contains a lot of implementation details specific to MetaMask, and is probably
 not suitable for out-of-the-box use with other wallets.
 
-Implements the Ethereum JavaScript provider specification, [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193).
-
 ## Installation
 
 `yarn add @metamask/inpage-provider`
@@ -13,7 +11,7 @@ Implements the Ethereum JavaScript provider specification, [EIP-1193](https://ei
 ## Usage
 
 ```javascript
-import { initializeProvider } from '@metamask/inpage-provider'
+import { initProvider } from '@metamask/inpage-provider'
 
 // Create a stream to a remote provider:
 const metamaskStream = new LocalMessageDuplexStream({
@@ -22,17 +20,12 @@ const metamaskStream = new LocalMessageDuplexStream({
 })
 
 // this will initialize the provider and set it as window.ethereum
-initializeProvider({
+initProvider({
   connectionStream: metamaskStream,
 })
 
 const { ethereum } = window
 ```
-
-### Types
-
-Types are exposed at `index.d.ts`.
-They require Node.js `EventEmitter` and `Duplex` stream types, which you can grab from e.g. [`@types/node`](https://npmjs.com/package/@types/node).
 
 ### Do Not Modify the Provider
 
